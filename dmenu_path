@@ -1,13 +1,31 @@
 #!/bin/sh
+#!/bin/sh
 
+# Set the cache directory and file path
 cachedir="${XDG_CACHE_HOME:-"$HOME/.cache"}"
 cache="$cachedir/dmenu_run"
 
-[ ! -e "$cachedir" ] && mkdir -p "$cachedir"
+# Create the cache directory if it doesn't exist
+mkdir -p "$cachedir"
 
-IFS=:
-if stest -dqr -n "$cache" $PATH; then
-	stest -flx $PATH | sort -u | tee "$cache"
-else
-	cat "$cache"
-fi
+# Find executables, sort them, and save to the cache.
+# This approach avoids issues with IFS in subshells.
+# 1. `echo "$PATH"` prints the PATH variable.
+# 2. `tr ':' '\n'` replaces every colon with a newline.
+# 3. The `while` loop reads each directory line by line.
+echo "$PATH" | tr ':' '\n' | while IFS= read -r dir; do
+  # Skip empty or non-existent directories
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    continue
+  fi
+
+  # Use `find` for a more efficient and reliable way to get executables.
+  # -maxdepth 1: Prevents descending into subdirectories.
+  # -type f: Ensures it's a regular file.
+  # -executable: Checks for the executable bit.
+  # -printf "%f\n": Prints just the filename followed by a newline.
+  find "$dir" -maxdepth 1 -type f -executable -printf "%f\n"
+done | sort -u > "$cache"
+
+# Output the contents of the cache
+cat "$cache"
